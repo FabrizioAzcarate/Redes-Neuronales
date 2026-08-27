@@ -1,19 +1,17 @@
-# Deep Learning Base Framework - Agente Autónomo
+# Clasificador de Errores y Calidad de Código en Python
 
-## Descripción del Proyecto
-Este repositorio constituye una infraestructura base modular para la creación, entrenamiento, evaluación e iteración de modelos de redes neuronales utilizando PyTorch. Está diseñado específicamente para ser operado por un **Agente de IA Autónomo**, el cual puede ejecutar experimentos, ajustar hiperparámetros y registrar métricas de manera independiente.
+## Descripción
+Proyecto de Deep Learning enfocado en analizar fragmentos de código fuente y clasificar la presencia de errores sintácticos, malas prácticas o riesgos de seguridad mediante un modelo de lenguaje modular operado por un Agente autónomo en Google Colab.
 
-## Estructura del Repositorio
-- `AGENT.md`: Definición del rol, reglas de interacción y directrices del agente autónomo.
-- `SKILL.md`: Descripción detallada de las capacidades y habilidades técnicas del agente.
-- `MEMORIA.md`: Bitácora y registro de métricas de los experimentos realizados.
-- `COMMANDS.md`: Lista de comandos autorizados para la ejecución en terminal.
-- `src/`: Modulos de Python para la arquitectura, carga de datos, entrenamiento y evaluación.
+## Arquitectura y Parámetros Base
+- **Backbone:** ResNet18 preentrenada en ImageNet (capa final adaptada a 2 clases).
+- **Optimizador:** Adam / SGD.
+- **Función de Pérdida:** CrossEntropyLoss.
+- **Entorno de Ejecución:** Google Colab (GPU T4).
 
-## Guía de Configuración
-1. Crear el entorno virtual:
-   ```bash
-   python -m venv venv --without-pip
-   .\venv\Scripts\Activate.ps1
-   python -m ensurepip
-   python -m pip install --upgrade pip
+## Estructura del Proyecto
+- `AGENT.md`: Protocolo y reglas del agente autónomo.
+- `SKILL.md`: Catálogo de habilidades del agente.
+- `MEMORIA.md`: Registro histórico de experimentos y feedback loop.
+- `COMMANDS.md`: Lista de comandos autorizados para ejecutar en Colab / Terminal.
+- `src/`: Código fuente modularizado (`dataset.py`, `model.py`, `train.py`, `evaluate.py`).

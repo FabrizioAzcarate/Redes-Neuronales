@@ -1,6 +1,8 @@
 import argparse
-import torch
-from torch.utils.data import Dataset, DataLoader
+import pandas as pd
+from torch.utils.data import Dataset
+
+from ast_parser import code_to_ast_sequence
 
 class CodeDataset(Dataset):
     def __init__(self, samples):
@@ -12,14 +14,18 @@ class CodeDataset(Dataset):
     def __getitem__(self, idx):
         return self.samples[idx]
 
-def download_and_prepare_data():
-    print("[INFO] Preparando dataset de fragmentos de código en Python...")
-    print("[INFO] Categorías: 0: Clean | 1: SyntaxError | 2: SecurityRisk | 3: BadPractice")
-    print("[INFO] Tokenización y vectorización de secuencias listas.")
+def preprocess_dataset(input_csv="data/raw_dataset.csv", output_csv="data/ast_dataset.csv"):
+    df = pd.read_csv(input_csv)
+
+    print("[INFO] Convirtiendo fragmentos de código a secuencias AST...")
+    df["ast_sequence"] = df["code"].apply(code_to_ast_sequence)
+
+    df.to_csv(output_csv, index=False)
+    print(f"[ÉXITO] Dataset procesado con AST guardado en: {output_csv}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Gestión de Datos de Código")
-    parser.add_argument("--download", action="store_true", help="Descarga/Genera el dataset")
+    parser = argparse.ArgumentParser(description="Preprocesamiento del dataset de código")
+    parser.add_argument("--input-csv", default="data/raw_dataset.csv", help="CSV de entrada")
+    parser.add_argument("--output-csv", default="data/ast_dataset.csv", help="CSV procesado de salida")
     args = parser.parse_args()
-    if args.download:
-        download_and_prepare_data()
+    preprocess_dataset(args.input_csv, args.output_csv)

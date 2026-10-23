@@ -6,6 +6,7 @@ from typing import Optional
 
 import torch
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 SRC_DIR = Path(__file__).resolve().parent
@@ -44,6 +45,18 @@ if MODEL_PATH.is_file():
         model_error = str(error)
 else:
     model_error = f"No se encontró el modelo en {MODEL_PATH}"
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_frontend():
+    """Sirve el frontend desde la raíz del proyecto o desde src/app.html."""
+    project_root = Path(__file__).resolve().parent.parent
+    html_path = project_root / "index.html"
+    if not html_path.is_file():
+        html_path = Path(__file__).resolve().parent / "app.html"
+    if not html_path.is_file():
+        raise HTTPException(status_code=404, detail="Frontend no encontrado")
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 
 @app.get("/health")

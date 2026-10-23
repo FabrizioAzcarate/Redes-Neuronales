@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Linter Inteligente Explicable</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans p-6">
+
+    <header class="mb-6 border-b border-gray-800 pb-4">
+        <h1 class="text-2xl font-bold text-white">Linter Inteligente Explicable (AST + BiLSTM)</h1>
+        <p class="text-sm text-gray-400">Analizador sintáctico asistido por Redes Neuronales y Mecanismo de Atención</p>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Panel Izquierdo: Editor de Código -->
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col h-[500px]">
+            <h2 class="text-lg font-semibold mb-3 text-gray-200">Código Python de Entrada</h2>
+            <div id="editor" class="flex-grow rounded overflow-hidden border border-gray-700"></div>
+            <button id="btn-analyze" onclick="analyzeCode()" class="mt-4 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition">
+                Analizar Código
+            </button>
+        </div>
+
+        <!-- Panel Derecho: Diagnóstico -->
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col h-[500px] overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-3 text-gray-200">Diagnóstico del Linter</h2>
+            
+            <div id="status-banner" class="bg-blue-950 border border-blue-800 text-blue-300 text-xs p-2 rounded mb-4">
+                Modo Demostración / Servidor API no detectado en puerto 8000
+            </div>
+
+            <div id="results" class="space-y-4">
+                <div class="bg-red-950/40 border border-red-800 text-red-200 p-3 rounded">
+                    <p class="font-semibold text-sm">Línea 4, 5: Advertencia de Tipo / Entrada de Datos</p>
+                    <p class="text-xs mt-1 text-red-300">Uso de input() sin conversión explícita int() o float(). Si la función sum() espera operandos numéricos, provocará concatenación de cadenas.</p>
+                </div>
+
+                <div class="bg-gray-900 p-3 rounded border border-gray-700 text-xs space-y-1">
+                    <p><span class="text-gray-400">Clasificación del Modelo:</span> <span class="font-mono text-green-400">Type Mismatch / Implicit Cast</span></p>
+                    <p><span class="text-gray-400">Nivel de Confianza (BiLSTM):</span> <span class="font-mono text-green-400">93.8%</span></p>
+                </div>
+
+                <div class="bg-gray-900 p-3 rounded border border-gray-700">
+                    <p class="text-xs font-semibold text-gray-400 mb-2">Ponderación de Atención (Attention Weights)</p>
+                    <pre id="json-weights" class="text-xs font-mono text-yellow-400">{
+  "Call:input": 0.8420,
+  "Name:sum": 0.1050,
+  "BinOp:Add": 0.0530
+}</pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let editor;
+
+        // Cargar Monaco Editor (IDE de VS Code en la web)
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: `def sum(a, b):\n    return (a + b)\n\na = input('Enter 1st number: ')\nb = input('Enter 2nd number: ')\n\nprint(f'Sum is {sum(a,b)}')`,
+                language: 'python',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false }
+            });
+        });
+
+        async function analyzeCode() {
+            const button = document.getElementById('btn-analyze');
+            const statusBanner = document.getElementById('status-banner');
+            if (!editor) {
+                statusBanner.textContent = 'El editor todavía se está inicializando.';
+                return;
+            }
+
+            button.disabled = true;
+            statusBanner.style.display = 'block';
+            statusBanner.textContent = 'Analizando código...';
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: editor.getValue() })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    const detail = typeof errorData.detail === 'string'
+                        ? errorData.detail
+                        : `La API devolvió HTTP ${response.status}.`;
+                    throw new Error(detail);
+                }
+
+                const data = await response.json();
+                renderResults(data);
+                statusBanner.style.display = 'none';
+            } catch (error) {
+                console.error('Error al conectar con la red neuronal:', error);
+                statusBanner.textContent = `No se pudo analizar el código: ${error.message}`;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function renderResults(data) {
+            const results = document.getElementById('results');
+            results.replaceChildren();
+
+            const classificationCard = document.createElement('div');
+            classificationCard.className = 'bg-gray-900 p-3 rounded border border-gray-700 text-xs space-y-1';
+            const category = document.createElement('p');
+            category.textContent = `Clasificación del Modelo: ${data.category}`;
+            const confidence = document.createElement('p');
+            const confidencePercent = typeof data.confidence === 'number'
+                ? new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 1 }).format(data.confidence)
+                : 'No disponible';
+            confidence.textContent = `Nivel de Confianza (BiLSTM): ${confidencePercent}`;
+            classificationCard.append(category, confidence);
+            results.append(classificationCard);
+
+            const attentionCard = document.createElement('div');
+            attentionCard.className = 'bg-gray-900 p-3 rounded border border-gray-700';
+            const attentionTitle = document.createElement('p');
+            attentionTitle.className = 'text-xs font-semibold text-gray-400 mb-2';
+            attentionTitle.textContent = 'Ponderación de Atención (Attention Weights)';
+            attentionCard.append(attentionTitle);
+
+            const attentionList = document.createElement('ul');
+            attentionList.className = 'text-xs font-mono text-yellow-400 space-y-1';
+            for (const item of data.attention_breakdown || []) {
+                const entry = document.createElement('li');
+                entry.textContent = `${item.node}: ${item.relevance}`;
+                attentionList.append(entry);
+            }
+            attentionCard.append(attentionList);
+            results.append(attentionCard);
+
+            if (data.ast_sequence) {
+                const astDetails = document.createElement('details');
+                astDetails.className = 'bg-gray-900 p-3 rounded border border-gray-700';
+                const summary = document.createElement('summary');
+                summary.className = 'text-xs font-semibold text-gray-400 cursor-pointer';
+                summary.textContent = 'Secuencia AST analizada';
+                const astContent = document.createElement('pre');
+                astContent.className = 'mt-2 text-xs font-mono text-gray-300 whitespace-pre-wrap';
+                astContent.textContent = JSON.stringify(data.ast_sequence, null, 2);
+                astDetails.append(summary, astContent);
+                results.append(astDetails);
+            }
+        }
+    </script>
+</body>
+</html>

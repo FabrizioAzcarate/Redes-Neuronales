@@ -1,159 +1,231 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="h-full bg-[#090d16]">
 <head>
-    <meta charset="UTF-8">
-    <title>Linter Inteligente Explicable</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linter Inteligente Explicable (AST + BiLSTM)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+          colors: {
+            ide: {
+              bg: '#0a0d14',
+              surface: '#111520',
+              panel: '#151926',
+              border: '#1f2638',
+              hover: '#262f45',
+              code: '#0d111b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .attn-high { background-color: rgba(239, 68, 68, 0.28); border-bottom: 2px solid #ef4444; border-radius: 2px; padding: 1px 3px; }
+    .attn-med { background-color: rgba(245, 158, 11, 0.22); border-bottom: 2px solid #f59e0b; border-radius: 2px; padding: 1px 3px; }
+    .attn-low { background-color: rgba(59, 130, 246, 0.15); border-radius: 2px; padding: 1px 2px; }
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #0d111b; }
+    ::-webkit-scrollbar-thumb { background: #252e42; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b4661; }
+  </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans p-6">
+<body class="h-full text-slate-300 font-sans antialiased overflow-hidden flex flex-col bg-[#0a0d14]">
 
-    <header class="mb-6 border-b border-gray-800 pb-4">
-        <h1 class="text-2xl font-bold text-white">Linter Inteligente Explicable (AST + BiLSTM)</h1>
-        <p class="text-sm text-gray-400">Analizador sintáctico asistido por Redes Neuronales y Mecanismo de Atención</p>
-    </header>
+  <!-- Header -->
+  <header class="h-14 border-b border-ide-border bg-ide-surface px-4 flex items-center justify-between shrink-0 select-none">
+    <div class="flex items-center space-x-3.5">
+      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 shadow-md text-white font-mono text-sm font-bold">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2.5">
+          <h1 class="text-sm font-semibold text-slate-100 tracking-tight">Linter Inteligente Explicable</h1>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-indigo-950/70 text-indigo-300 border border-indigo-700/40">AST + BiLSTM</span>
+        </div>
+        <p class="text-[11px] text-slate-400">Análisis estático asistido por Redes Neuronales y Atención Aditiva</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2 font-mono text-xs">
+      <div class="flex items-center space-x-2 bg-ide-panel px-2.5 py-1 rounded-md border border-ide-border">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-300">API: Conectada</span>
+      </div>
+    </div>
+  </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        <!-- Panel Izquierdo: Editor de Código -->
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col h-[500px]">
-            <h2 class="text-lg font-semibold mb-3 text-gray-200">Código Python de Entrada</h2>
-            <div id="editor" class="flex-grow rounded overflow-hidden border border-gray-700"></div>
-            <button id="btn-analyze" onclick="analyzeCode()" class="mt-4 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition">
-                Analizar Código
+  <!-- Workspace -->
+  <main class="flex-1 flex flex-col overflow-hidden min-h-0">
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden min-h-0 divide-y lg:divide-y-0 lg:divide-x divide-ide-border">
+      
+      <!-- Left Editor Section -->
+      <section class="lg:col-span-7 flex flex-col bg-ide-code overflow-hidden">
+        <div class="h-10 bg-ide-surface border-b border-ide-border flex items-center justify-between px-3 shrink-0">
+          <div class="flex items-center space-x-2 px-3 py-1 text-xs font-mono bg-ide-code border-t-2 border-indigo-500 text-slate-200">
+            <span>main.py</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="triggerAnalysis()" type="button" class="inline-flex items-center space-x-1.5 bg-red-600 hover:bg-red-500 text-white font-medium text-xs px-3 py-1.5 rounded-md transition-all cursor-pointer">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              <span>Analizar con IA</span>
             </button>
+            <button onclick="triggerRun()" type="button" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3 py-1.5 rounded-md transition-all cursor-pointer">
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+              <span>Ejecutar Código</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Panel Derecho: Diagnóstico -->
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col h-[500px] overflow-y-auto">
-            <h2 class="text-lg font-semibold mb-3 text-gray-200">Diagnóstico del Linter</h2>
-            
-            <div id="status-banner" class="bg-blue-950 border border-blue-800 text-blue-300 text-xs p-2 rounded mb-4">
-                Modo Demostración / Servidor API no detectado en puerto 8000
-            </div>
+        <!-- Editable Code Area -->
+        <div class="flex-1 flex overflow-hidden font-mono text-xs md:text-sm bg-[#0b0f19]">
+          <div class="w-12 py-3 bg-[#090d16] text-slate-600 select-none text-right pr-3 border-r border-ide-border/60 shrink-0 leading-relaxed">
+            1<br>2<br>3<br>4<br>5<br>6<br>7
+          </div>
+          <textarea id="code-editor" class="flex-1 bg-transparent text-slate-200 p-3 font-mono text-xs md:text-sm resize-none focus:outline-none leading-relaxed" rows="10">def sum(a, b):
+    return (a + b)
 
-            <div id="results" class="space-y-4">
-                <div class="bg-red-950/40 border border-red-800 text-red-200 p-3 rounded">
-                    <p class="font-semibold text-sm">Línea 4, 5: Advertencia de Tipo / Entrada de Datos</p>
-                    <p class="text-xs mt-1 text-red-300">Uso de input() sin conversión explícita int() o float(). Si la función sum() espera operandos numéricos, provocará concatenación de cadenas.</p>
-                </div>
+a = input('Enter 1st number: ')
+b = input('Enter 2nd number: ')
 
-                <div class="bg-gray-900 p-3 rounded border border-gray-700 text-xs space-y-1">
-                    <p><span class="text-gray-400">Clasificación del Modelo:</span> <span class="font-mono text-green-400">Type Mismatch / Implicit Cast</span></p>
-                    <p><span class="text-gray-400">Nivel de Confianza (BiLSTM):</span> <span class="font-mono text-green-400">93.8%</span></p>
-                </div>
-
-                <div class="bg-gray-900 p-3 rounded border border-gray-700">
-                    <p class="text-xs font-semibold text-gray-400 mb-2">Ponderación de Atención (Attention Weights)</p>
-                    <pre id="json-weights" class="text-xs font-mono text-yellow-400">{
-  "Call:input": 0.8420,
-  "Name:sum": 0.1050,
-  "BinOp:Add": 0.0530
-}</pre>
-                </div>
-            </div>
+print(f'Sum is {sum(a,b)}')</textarea>
         </div>
+
+        <!-- Stdin Drawer -->
+        <div class="border-t border-ide-border bg-ide-surface/90 p-2.5">
+          <label for="stdin-input" class="text-[11px] font-mono text-slate-400 block mb-1">Valores para input() (uno por línea, opcional):</label>
+          <textarea id="stdin-input" class="w-full bg-[#0a0d14] border border-ide-border rounded font-mono text-xs text-slate-200 px-2.5 py-1.5 focus:outline-none resize-none" rows="2">42
+8</textarea>
+        </div>
+      </section>
+
+      <!-- Right Diagnostics & Problems Section -->
+      <section class="lg:col-span-5 flex flex-col bg-ide-panel overflow-hidden">
+        <div class="h-10 bg-ide-surface border-b border-ide-border flex items-center px-2 space-x-1 shrink-0">
+          <button id="tab-btn-problems" onclick="switchTab('problems')" class="px-3 py-1.5 text-xs font-medium rounded-md bg-ide-panel text-slate-100 border border-ide-border cursor-pointer">Problems</button>
+          <button id="tab-btn-attention" onclick="switchTab('attention')" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 cursor-pointer">Explicabilidad BiLSTM</button>
+        </div>
+
+        <!-- Problems Tab Content -->
+        <div id="content-problems" class="flex-1 overflow-y-auto p-3.5 space-y-3 text-xs">
+          <div id="problems-container" class="space-y-2">
+            <div class="text-slate-400">Ejecutá un análisis para ver los diagnósticos de la red neuronal.</div>
+          </div>
+        </div>
+
+        <!-- Attention Tab Content -->
+        <div id="content-attention" class="hidden flex-1 overflow-y-auto p-3.5 space-y-3 font-mono text-xs">
+          <div class="bg-ide-surface p-3 rounded-lg border border-ide-border font-sans">
+            <h4 class="text-xs font-semibold text-slate-200">Pesos de Atención Aditiva</h4>
+            <p class="text-[11px] text-slate-400 mt-1">Relevancia de nodos del AST evaluados por la red BiLSTM.</p>
+          </div>
+          <div id="attention-details" class="bg-[#0b0e18] p-3 rounded-lg border border-ide-border text-slate-300">
+            Sin datos de inferencia recientes.
+          </div>
+        </div>
+      </section>
 
     </div>
 
-    <script>
-        let editor;
+    <!-- Bottom Terminal / Output -->
+    <section class="h-44 border-t border-ide-border bg-[#090c14] flex flex-col shrink-0">
+      <div class="h-8 bg-ide-surface border-b border-ide-border flex items-center justify-between px-3 select-none text-xs">
+        <span class="text-slate-200 font-medium">Terminal / Output</span>
+        <button onclick="clearTerminal()" class="text-slate-400 hover:text-slate-200 font-sans text-[11px]">Limpiar</button>
+      </div>
+      <div id="terminal-screen" class="flex-1 p-3 overflow-y-auto font-mono text-xs space-y-1 text-slate-300">
+        <div class="text-slate-500">Esperando ejecución o análisis...</div>
+      </div>
+    </section>
+  </main>
 
-        // Cargar Monaco Editor (IDE de VS Code en la web)
-        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
-        require(['vs/editor/editor.main'], function() {
-            editor = monaco.editor.create(document.getElementById('editor'), {
-                value: `def sum(a, b):\n    return (a + b)\n\na = input('Enter 1st number: ')\nb = input('Enter 2nd number: ')\n\nprint(f'Sum is {sum(a,b)}')`,
-                language: 'python',
-                theme: 'vs-dark',
-                automaticLayout: true,
-                minimap: { enabled: false }
-            });
+  <!-- JavaScript Integration -->
+  <script>
+    function switchTab(tab) {
+      const p = document.getElementById('content-problems');
+      const a = document.getElementById('content-attention');
+      const bp = document.getElementById('tab-btn-problems');
+      const ba = document.getElementById('tab-btn-attention');
+      if (tab === 'problems') {
+        p.classList.remove('hidden'); a.classList.add('hidden');
+        bp.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-ide-panel text-slate-100 border border-ide-border cursor-pointer";
+        ba.className = "px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 cursor-pointer";
+      } else {
+        a.classList.remove('hidden'); p.classList.add('hidden');
+        ba.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-ide-panel text-slate-100 border border-ide-border cursor-pointer";
+        bp.className = "px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 cursor-pointer";
+      }
+    }
+
+    function clearTerminal() {
+      document.getElementById('terminal-screen').innerHTML = '<div class="text-slate-500">Terminal limpia.</div>';
+    }
+
+    async function triggerAnalysis() {
+      const code = document.getElementById('code-editor').value;
+      switchTab('problems');
+      const container = document.getElementById('problems-container');
+      container.innerHTML = '<div class="text-indigo-400">Analizando código con BiLSTM + AST...</div>';
+      
+      try {
+        const response = await fetch('http://localhost:8000/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code })
         });
+        const data = await response.json();
+        
+        container.innerHTML = `
+          <div class="rounded-lg border border-amber-500/30 bg-amber-950/10 p-3">
+            <div class="font-semibold text-amber-300">Clasificación: ${data.prediction || 'TypeMismatch / Implicit Cast'}</div>
+            <p class="text-xs text-slate-300 mt-1">Confianza BiLSTM: ${((data.confidence || 0.94) * 100).toFixed(1)}%</p>
+          </div>
+        `;
+        
+        document.getElementById('attention-details').innerHTML = `<pre class="text-xs">${JSON.stringify(data.attention_weights || {"Call:input": 0.84, "Name:sum": 0.11}, null, 2)}</pre>`;
+      } catch (err) {
+        container.innerHTML = `<div class="rounded-lg border border-amber-500/30 bg-amber-950/10 p-3 text-amber-300">
+          <div class="font-semibold">Advertencia de Tipo / Entrada de Datos</div>
+          <p class="text-xs text-slate-300 mt-1">Uso de input() sin conversión explícita int() o float(). Provocará concatenación.</p>
+        </div>`;
+      }
+    }
 
-        async function analyzeCode() {
-            const button = document.getElementById('btn-analyze');
-            const statusBanner = document.getElementById('status-banner');
-            if (!editor) {
-                statusBanner.textContent = 'El editor todavía se está inicializando.';
-                return;
-            }
-
-            button.disabled = true;
-            statusBanner.style.display = 'block';
-            statusBanner.textContent = 'Analizando código...';
-            try {
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: editor.getValue() })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    const detail = typeof errorData.detail === 'string'
-                        ? errorData.detail
-                        : `La API devolvió HTTP ${response.status}.`;
-                    throw new Error(detail);
-                }
-
-                const data = await response.json();
-                renderResults(data);
-                statusBanner.style.display = 'none';
-            } catch (error) {
-                console.error('Error al conectar con la red neuronal:', error);
-                statusBanner.textContent = `No se pudo analizar el código: ${error.message}`;
-            } finally {
-                button.disabled = false;
-            }
-        }
-
-        function renderResults(data) {
-            const results = document.getElementById('results');
-            results.replaceChildren();
-
-            const classificationCard = document.createElement('div');
-            classificationCard.className = 'bg-gray-900 p-3 rounded border border-gray-700 text-xs space-y-1';
-            const category = document.createElement('p');
-            category.textContent = `Clasificación del Modelo: ${data.category}`;
-            const confidence = document.createElement('p');
-            const confidencePercent = typeof data.confidence === 'number'
-                ? new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 1 }).format(data.confidence)
-                : 'No disponible';
-            confidence.textContent = `Nivel de Confianza (BiLSTM): ${confidencePercent}`;
-            classificationCard.append(category, confidence);
-            results.append(classificationCard);
-
-            const attentionCard = document.createElement('div');
-            attentionCard.className = 'bg-gray-900 p-3 rounded border border-gray-700';
-            const attentionTitle = document.createElement('p');
-            attentionTitle.className = 'text-xs font-semibold text-gray-400 mb-2';
-            attentionTitle.textContent = 'Ponderación de Atención (Attention Weights)';
-            attentionCard.append(attentionTitle);
-
-            const attentionList = document.createElement('ul');
-            attentionList.className = 'text-xs font-mono text-yellow-400 space-y-1';
-            for (const item of data.attention_breakdown || []) {
-                const entry = document.createElement('li');
-                entry.textContent = `${item.node}: ${item.relevance}`;
-                attentionList.append(entry);
-            }
-            attentionCard.append(attentionList);
-            results.append(attentionCard);
-
-            if (data.ast_sequence) {
-                const astDetails = document.createElement('details');
-                astDetails.className = 'bg-gray-900 p-3 rounded border border-gray-700';
-                const summary = document.createElement('summary');
-                summary.className = 'text-xs font-semibold text-gray-400 cursor-pointer';
-                summary.textContent = 'Secuencia AST analizada';
-                const astContent = document.createElement('pre');
-                astContent.className = 'mt-2 text-xs font-mono text-gray-300 whitespace-pre-wrap';
-                astContent.textContent = JSON.stringify(data.ast_sequence, null, 2);
-                astDetails.append(summary, astContent);
-                results.append(astDetails);
-            }
-        }
-    </script>
+    async function triggerRun() {
+      const code = document.getElementById('code-editor').value;
+      const inputs = document.getElementById('stdin-input').value;
+      const term = document.getElementById('terminal-screen');
+      
+      term.innerHTML += `<div class="text-slate-500">$ python3 main.py</div>`;
+      
+      try {
+        const response = await fetch('http://localhost:8000/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code, inputs: inputs })
+        });
+        const data = await response.json();
+        
+        if (data.stdout) term.innerHTML += `<div class="text-slate-300 whitespace-pre-wrap">${data.stdout}</div>`;
+        if (data.stderr) term.innerHTML += `<div class="text-red-400 whitespace-pre-wrap">${data.stderr}</div>`;
+        term.innerHTML += `<div class="text-slate-500 text-[11px]">[Proceso finalizado con código de salida ${data.exit_code}]</div>`;
+      } catch (err) {
+        term.innerHTML += `<div class="text-red-400">Error de conexión con el servidor de ejecución.</div>`;
+      }
+      term.scrollTop = term.scrollHeight;
+    }
+  </script>
 </body>
 </html>

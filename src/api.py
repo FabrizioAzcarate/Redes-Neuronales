@@ -1,13 +1,15 @@
 """API REST para el Linter Inteligente de código Python."""
 
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 from typing import Optional
 
 import torch
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 SRC_DIR = Path(__file__).resolve().parent
 if str(SRC_DIR) not in sys.path:
@@ -25,6 +27,12 @@ class CodeRequest(BaseModel):
     """Código Python que será analizado por el linter."""
 
     code: str
+
+
+class RunRequest(CodeRequest):
+    """Código y valores opcionales para las llamadas a input()."""
+
+    input_values: list[str] = Field(default_factory=list)
 
 
 app = FastAPI(
@@ -47,16 +55,18 @@ else:
     model_error = f"No se encontró el modelo en {MODEL_PATH}"
 
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_frontend():
-    """Sirve el frontend desde la raíz del proyecto o desde src/app.html."""
+@app.get("/")
+def serve_frontend():
+    """Sirve el frontend desde la raíz del proyecto o desde src."""
     project_root = Path(__file__).resolve().parent.parent
     html_path = project_root / "index.html"
+    if not html_path.is_file():
+        html_path = Path(__file__).resolve().parent / "index.html"
     if not html_path.is_file():
         html_path = Path(__file__).resolve().parent / "app.html"
     if not html_path.is_file():
         raise HTTPException(status_code=404, detail="Frontend no encontrado")
-    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    return FileResponse(html_path)
 
 
 @app.get("/health")
@@ -78,7 +88,9 @@ def analyze(request: CodeRequest):
             detail=f"El modelo no está disponible: {model_error}",
         )
 
+    logs = ["Inicio del análisis de código"]
     ast_sequence = code_to_ast_sequence(request.code)
+    logs.append("Parsing AST completado")
     if tokenizer is None:
         active_tokenizer = _build_fallback_tokenizer(
             ast_sequence, model.embedding.num_embeddings
@@ -96,6 +108,7 @@ def analyze(request: CodeRequest):
             logits, attention_weights = model(inputs)
             probabilities = torch.softmax(logits, dim=1)
             predicted_index = int(torch.argmax(probabilities, dim=1).item())
+        logs.append("Inferencia BiLSTM exitosa")
 
         weights = attention_weights[0].detach().cpu().tolist()
         breakdown = sorted(
@@ -106,18 +119,90 @@ def analyze(request: CodeRequest):
             if predicted_index < len(CLASS_NAMES)
             else str(predicted_index)
         )
+        logs.append("Cálculo de pesos de atención aditiva completado")
+        input_lines = [
+            line_number
+            for line_number, line in enumerate(request.code.splitlines(), start=1)
+            if "input(" in line
+        ]
+        issues = [
+            {
+                "severity": "info" if category.lower() in {"good", "ok"} else "warning",
+                "code": category,
+                "message": f"Clasificación detectada: {category}.",
+                "node": breakdown[0][0] if breakdown else None,
+                "line": input_lines[0] if input_lines else None,
+            }
+        ]
 
         return {
             "category": category,
             "confidence": round(float(probabilities[0, predicted_index].item()), 4),
+            "code": request.code,
             "ast_sequence": ast_sequence,
+            "issues": issues,
             "attention_breakdown": [
                 {"node": node, "relevance": f"{weight:.1%}"}
                 for node, weight in breakdown
             ],
+            "logs": logs + ["Análisis finalizado"],
         }
     except (RuntimeError, TypeError, ValueError, KeyError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/run")
+def run_code(request: RunRequest):
+    """Ejecuta código en un proceso aislado con un límite de tres segundos."""
+    script_path: Optional[Path] = None
+    user_inputs_string = "\n".join(request.input_values)
+    if request.input_values:
+        user_inputs_string += "\n"
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".py", delete=False
+        ) as script:
+            script.write(request.code)
+            script_path = Path(script.name)
+
+        completed = subprocess.run(
+            [sys.executable, "-I", "-B", str(script_path)],
+            input=user_inputs_string,
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+            shell=False,
+            cwd=script_path.parent,
+        )
+        return {
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+            "return_code": completed.returncode,
+            "timed_out": False,
+        }
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout or ""
+        stderr = error.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        return {
+            "stdout": stdout,
+            "stderr": stderr
+            + "\nEjecución cancelada: superó el límite de 3 segundos.",
+            "return_code": None,
+            "timed_out": True,
+        }
+    except (OSError, ValueError) as error:
+        raise HTTPException(
+            status_code=500, detail=f"No se pudo ejecutar el código: {error}"
+        ) from error
+    finally:
+        if script_path is not None:
+            script_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

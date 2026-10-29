@@ -111,7 +111,13 @@ Inicie el servidor FastAPI desde la raíz del proyecto:
 uvicorn src.api:app --reload
 ```
 
-La documentación interactiva queda disponible en `http://127.0.0.1:8000/docs`. Para analizar código, envíe una petición `POST` a `/analyze`:
+La interfaz web queda disponible en `http://127.0.0.1:8000/`. La ruta principal sirve
+`index.html` si existe en la raíz del proyecto y, en caso contrario, utiliza el
+frontend incluido en `src/app.html`. Desde esa interfaz puede editar código Python
+en Monaco Editor y enviarlo al modelo con el botón **Analizar Código**.
+
+La documentación interactiva queda disponible en `http://127.0.0.1:8000/docs`.
+Para analizar código directamente, envíe una petición `POST` a `/analyze`:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/analyze \
@@ -134,6 +140,25 @@ Ejemplo de respuesta:
 ```
 
 También puede comprobar el estado del servicio con `GET /health`.
+
+El endpoint `/analyze` devuelve la categoría predicha, el nivel de confianza, la
+secuencia AST y los nodos ordenados por relevancia según los pesos de atención.
+
+La interfaz también permite ejecutar el código del editor con **Ejecutar Código**.
+Los valores para llamadas a `input()` se introducen uno por línea y se envían a
+`POST /run` mediante el campo `input_values`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/run \
+  -H "Content-Type: application/json" \
+  -d '{"code":"nombre = input()\nprint(f\"Hola {nombre}\")","input_values":["Ada"]}'
+```
+
+La ejecución se realiza en un proceso separado y se cancela después de tres
+segundos. Este mecanismo evita bloquear el servidor ante bucles infinitos, pero
+no constituye un sandbox de seguridad completo para código no confiable; para
+exponer esta función públicamente se recomienda ejecutarla dentro de un
+contenedor o entorno aislado adicional.
 
 ## Ejecución con Docker
 

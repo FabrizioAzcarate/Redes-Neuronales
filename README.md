@@ -146,12 +146,12 @@ secuencia AST y los nodos ordenados por relevancia según los pesos de atención
 
 La interfaz también permite ejecutar el código del editor con **Ejecutar Código**.
 Los valores para llamadas a `input()` se introducen uno por línea y se envían a
-`POST /run` mediante el campo `input_values`:
+`POST /run` mediante el campo `inputs` (una lista de valores, en el orden de cada llamada a `input()`):
 
 ```bash
 curl -X POST http://127.0.0.1:8000/run \
   -H "Content-Type: application/json" \
-  -d '{"code":"nombre = input()\nprint(f\"Hola {nombre}\")","input_values":["Ada"]}'
+  -d '{"code":"nombre = input()\nprint(f\"Hola {nombre}\")","inputs":["Ada"]}'
 ```
 
 La ejecución se realiza en un proceso separado y se cancela después de tres

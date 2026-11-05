@@ -8,6 +8,7 @@ from typing import Optional
 
 import torch
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -32,13 +33,20 @@ class CodeRequest(BaseModel):
 class RunRequest(CodeRequest):
     """Código y valores opcionales para las llamadas a input()."""
 
-    input_values: list[str] = Field(default_factory=list)
+    inputs: list[str] = Field(default_factory=list)
 
 
 app = FastAPI(
     title="Linter Inteligente de Código",
     description="Clasificación explicable de código Python mediante AST y BiLSTM.",
     version="1.0.0",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 model: Optional[torch.nn.Module] = None
@@ -155,8 +163,8 @@ def analyze(request: CodeRequest):
 def run_code(request: RunRequest):
     """Ejecuta código en un proceso aislado con un límite de tres segundos."""
     script_path: Optional[Path] = None
-    user_inputs_string = "\n".join(request.input_values)
-    if request.input_values:
+    user_inputs_string = "\n".join(request.inputs)
+    if request.inputs:
         user_inputs_string += "\n"
 
     try:

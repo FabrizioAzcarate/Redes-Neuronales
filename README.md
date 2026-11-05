@@ -113,8 +113,8 @@ uvicorn src.api:app --reload
 
 La interfaz web queda disponible en `http://127.0.0.1:8000/`. La ruta principal sirve
 `index.html` si existe en la raíz del proyecto y, en caso contrario, utiliza el
-frontend incluido en `src/app.html`. Desde esa interfaz puede editar código Python
-en Monaco Editor y enviarlo al modelo con el botón **Analizar Código**.
+frontend incluido en `src/index.html`. Desde esa interfaz puede editar código Python
+en el editor integrado y enviarlo al modelo con el botón **Analizar con la red**.
 
 La documentación interactiva queda disponible en `http://127.0.0.1:8000/docs`.
 Para analizar código directamente, envíe una petición `POST` a `/analyze`:

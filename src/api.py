@@ -1,5 +1,6 @@
 """API REST para el Linter Inteligente de código Python."""
 
+import ast
 from pathlib import Path
 import subprocess
 import sys
@@ -90,12 +91,38 @@ def health():
 @app.post("/analyze")
 def analyze(request: CodeRequest):
     """Analiza un fragmento de código y devuelve su explicación."""
+    try:
+        ast.parse(request.code)
+    except SyntaxError as error:
+        line = error.lineno or 1
+        column = error.offset or 1
+        description = error.msg or "error sintáctico no especificado"
+        message = f"Error de sintaxis en la línea {line}, columna {column}: {description}."
+        return {
+            "category": "SyntaxError",
+            "confidence": 1.0,
+            "code": request.code,
+            "ast_sequence": "SyntaxError InvalidSyntax",
+            "issues": [
+                {
+                    "severity": "error",
+                    "code": "SyntaxError",
+                    "message": message,
+                    "node": None,
+                    "line": line,
+                }
+            ],
+            "attention_breakdown": [],
+            "logs": ["Validación AST fallida", message],
+        }
+
     if model is None:
         raise HTTPException(
             status_code=503,
             detail=f"El modelo no está disponible: {model_error}",
         )
 
+    confidence_threshold = 0.60
     logs = ["Inicio del análisis de código"]
     ast_sequence = code_to_ast_sequence(request.code)
     logs.append("Parsing AST completado")
@@ -127,7 +154,52 @@ def analyze(request: CodeRequest):
             if predicted_index < len(CLASS_NAMES)
             else str(predicted_index)
         )
+        confidence = float(probabilities[0, predicted_index].item())
+        is_error_category = category.lower() not in {"clean", "good", "ok"}
         logs.append("Cálculo de pesos de atención aditiva completado")
+        if confidence < confidence_threshold:
+            clean_message = (
+                "No se detectaron anomalías críticas en el flujo; "
+                "el código supera la validación sintáctica."
+            )
+            return {
+                "category": "Clean",
+                "confidence": round(confidence, 4),
+                "code": request.code,
+                "ast_sequence": ast_sequence,
+                "issues": [
+                    {
+                        "severity": "info",
+                        "code": "Clean",
+                        "message": clean_message,
+                        "node": None,
+                        "line": None,
+                    }
+                ],
+                "attention_breakdown": [],
+                "logs": logs + ["Confianza inferior al umbral; análisis considerado limpio"],
+            }
+
+        if not is_error_category:
+            clean_message = "No se detectaron anomalías críticas en el flujo."
+            return {
+                "category": category,
+                "confidence": round(confidence, 4),
+                "code": request.code,
+                "ast_sequence": ast_sequence,
+                "issues": [
+                    {
+                        "severity": "info",
+                        "code": category,
+                        "message": clean_message,
+                        "node": None,
+                        "line": None,
+                    }
+                ],
+                "attention_breakdown": [],
+                "logs": logs + ["El modelo clasificó el código como limpio"],
+            }
+
         input_lines = [
             line_number
             for line_number, line in enumerate(request.code.splitlines(), start=1)
@@ -145,7 +217,7 @@ def analyze(request: CodeRequest):
 
         return {
             "category": category,
-            "confidence": round(float(probabilities[0, predicted_index].item()), 4),
+            "confidence": round(confidence, 4),
             "code": request.code,
             "ast_sequence": ast_sequence,
             "issues": issues,

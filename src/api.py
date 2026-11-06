@@ -19,7 +19,12 @@ if str(SRC_DIR) not in sys.path:
 
 from ast_parser import code_to_ast_sequence
 from cli import _build_fallback_tokenizer, _load_checkpoint
-from explainability import CLASS_NAMES, _tokenize_ast_sequence
+from explainability import (
+    _tokenize_ast_sequence,
+    class_name_from_index,
+    has_critical_security_risk,
+)
+from validator import validate_functional_errors
 
 MODEL_PATH = Path("models/bilstm_attention_model.pth")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -116,13 +121,36 @@ def analyze(request: CodeRequest):
             "logs": ["Validación AST fallida", message],
         }
 
+    functional_error = validate_functional_errors(request.code)
+    if functional_error is not None:
+        error_code = str(functional_error["error"])
+        message = str(functional_error["message"])
+        line = int(functional_error.get("line", 1))
+        return {
+            "category": "Error",
+            "confidence": 1.0,
+            "code": request.code,
+            "ast_sequence": code_to_ast_sequence(request.code),
+            "issues": [
+                {
+                    "severity": "error",
+                    "code": error_code,
+                    "message": message,
+                    "node": "BinOp" if error_code == "TypeError" else None,
+                    "line": line,
+                }
+            ],
+            "attention_breakdown": [],
+            "logs": ["Validación funcional determinista fallida", message],
+        }
+
     if model is None:
         raise HTTPException(
             status_code=503,
             detail=f"El modelo no está disponible: {model_error}",
         )
 
-    confidence_threshold = 0.60
+    confidence_threshold = 0.80
     logs = ["Inicio del análisis de código"]
     ast_sequence = code_to_ast_sequence(request.code)
     logs.append("Parsing AST completado")
@@ -149,13 +177,13 @@ def analyze(request: CodeRequest):
         breakdown = sorted(
             zip(nodes, weights), key=lambda item: item[1], reverse=True
         )
-        category = (
-            CLASS_NAMES[predicted_index]
-            if predicted_index < len(CLASS_NAMES)
-            else str(predicted_index)
-        )
+        category = class_name_from_index(predicted_index)
         confidence = float(probabilities[0, predicted_index].item())
-        is_error_category = category.lower() not in {"clean", "good", "ok"}
+        is_critical_security = (
+            category == "SecurityRisk"
+            and has_critical_security_risk(request.code)
+        )
+        is_error_category = is_critical_security
         logs.append("Cálculo de pesos de atención aditiva completado")
         if confidence < confidence_threshold:
             clean_message = (
@@ -183,14 +211,14 @@ def analyze(request: CodeRequest):
         if not is_error_category:
             clean_message = "No se detectaron anomalías críticas en el flujo."
             return {
-                "category": category,
+                "category": "Clean",
                 "confidence": round(confidence, 4),
                 "code": request.code,
                 "ast_sequence": ast_sequence,
                 "issues": [
                     {
                         "severity": "info",
-                        "code": category,
+                        "code": "Clean",
                         "message": clean_message,
                         "node": None,
                         "line": None,
@@ -207,7 +235,7 @@ def analyze(request: CodeRequest):
         ]
         issues = [
             {
-                "severity": "info" if category.lower() in {"good", "ok"} else "warning",
+                "severity": "error",
                 "code": category,
                 "message": f"Clasificación detectada: {category}.",
                 "node": breakdown[0][0] if breakdown else None,

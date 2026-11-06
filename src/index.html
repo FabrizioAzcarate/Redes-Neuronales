@@ -163,7 +163,9 @@ print(f'Sum is {sum(a,b)}')</textarea>
     switchTab('problems');
     const code = document.getElementById('code-input').value;
     const container = document.getElementById('problems-container');
+    const attentionContainer = document.getElementById('attention-map-container');
     container.innerHTML = '<div class="text-indigo-400 animate-pulse">Analizando código con BiLSTM + AST...</div>';
+    attentionContainer.innerHTML = '<div class="text-slate-500 animate-pulse">Calculando pesos de atención...</div>';
 
     try {
       const response = await fetch('http://127.0.0.1:8000/analyze', {
@@ -171,19 +173,59 @@ print(f'Sum is {sum(a,b)}')</textarea>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: code })
       });
+      if (!response.ok) {
+        throw new Error(`El análisis devolvió HTTP ${response.status}`);
+      }
       const data = await response.json();
-      
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+      const confidence = Number(data.confidence);
+      const issue = Array.isArray(data.issues) ? data.issues[0] : null;
+      const category = data.category || issue?.code || 'Sin clasificación';
+      const message = issue?.message || 'No se detectaron anomalías críticas en el flujo.';
+
       container.innerHTML = `
         <div class="rounded-lg border border-amber-500/30 bg-amber-950/10 p-3">
           <div class="flex justify-between items-center mb-1">
-            <span class="font-semibold text-amber-300">Diagnóstico IA: ${data.prediction || 'Advertencia General'}</span>
-            <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">Confianza: ${(data.confidence * 100).toFixed(1)}%</span>
+            <span class="font-semibold text-amber-300">Diagnóstico IA: ${escapeHtml(category)}</span>
+            <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">Confianza: ${Number.isFinite(confidence) ? (confidence * 100).toFixed(1) : 'N/D'}%</span>
           </div>
-          <p class="text-slate-300 text-xs">${data.message || 'Se detectó una posible inconsistencia semántica o de tipos en el flujo del código.'}</p>
+          <p class="text-slate-300 text-xs">${escapeHtml(message)}</p>
         </div>
       `;
+
+      const attention = Array.isArray(data.attention_breakdown)
+        ? data.attention_breakdown.filter((item) => item && item.node && item.relevance)
+        : [];
+
+      if (attention.length === 0) {
+        attentionContainer.innerHTML = '<div class="text-slate-400">No hay pesos de atención disponibles para este análisis.</div>';
+        return;
+      }
+
+      attentionContainer.innerHTML = attention.map((item) => {
+        const relevance = String(item.relevance);
+        const percentage = Math.min(Math.max(parseFloat(relevance) || 0, 0), 100);
+        return `
+          <div class="rounded-md border border-ide-border bg-ide-surface/60 p-2.5">
+            <div class="flex items-center justify-between gap-3 mb-1.5">
+              <span class="text-slate-300">${escapeHtml(item.node)}</span>
+              <span class="text-indigo-300">${escapeHtml(relevance)}</span>
+            </div>
+            <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div class="h-full rounded-full bg-indigo-500 transition-all" style="width: ${percentage}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
     } catch (e) {
       container.innerHTML = '<div class="text-rose-400">Error de conexión con el backend de análisis.</div>';
+      attentionContainer.innerHTML = '<div class="text-rose-400">No se pudieron cargar los pesos de atención.</div>';
     }
   }
 

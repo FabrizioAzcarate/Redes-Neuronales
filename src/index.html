@@ -152,6 +152,61 @@
     document.getElementById('terminal-screen').innerHTML = '<div class="text-slate-500">Terminal limpia.</div>';
   }
 
+  function getDiagnosticStyle(label, confidence) {
+    const styles = {
+      Clean: {
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        textColor: '#34D399',
+        badgeBg: '#065F46'
+      },
+      SyntaxError: {
+        borderColor: '#F59E0B',
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        textColor: '#FBBF24',
+        badgeBg: '#B45309'
+      },
+      SecurityRisk: {
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        textColor: '#F87171',
+        badgeBg: '#991B1B'
+      },
+      TypeError: {
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        textColor: '#F87171',
+        badgeBg: '#991B1B'
+      },
+      ZeroDivisionError: {
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        textColor: '#F87171',
+        badgeBg: '#991B1B'
+      },
+      Error: {
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        textColor: '#F87171',
+        badgeBg: '#991B1B'
+      }
+    };
+    const neutral = {
+      borderColor: '#6B7280',
+      backgroundColor: 'rgba(107, 114, 128, 0.1)',
+      textColor: '#9CA3AF',
+      badgeBg: '#374151'
+    };
+    const diagnosticStyle = styles[label] || neutral;
+    const isConfident = Number.isFinite(confidence) && confidence >= 0.8;
+
+    return {
+      ...diagnosticStyle,
+      confidenceTextColor: isConfident ? diagnosticStyle.textColor : '#9CA3AF',
+      confidenceBadgeBg: isConfident ? diagnosticStyle.badgeBg : '#374151'
+    };
+  }
+
   async function triggerAnalysis() {
     switchTab('problems');
     const code = document.getElementById('code-input').value;
@@ -180,13 +235,15 @@
       const confidence = Number(data.confidence);
       const issue = Array.isArray(data.issues) ? data.issues[0] : null;
       const category = data.category || issue?.code || 'Sin clasificación';
+      const styleLabel = category === 'Error' ? (issue?.code || category) : category;
+      const style = getDiagnosticStyle(styleLabel, confidence);
       const message = issue?.message || 'No se detectaron anomalías críticas en el flujo.';
 
       container.innerHTML = `
-        <div class="rounded-lg border border-amber-500/30 bg-amber-950/10 p-3">
+        <div class="rounded-lg border p-3" style="border-color: ${style.borderColor}; background-color: ${style.backgroundColor}">
           <div class="flex justify-between items-center mb-1">
-            <span class="font-semibold text-amber-300">Diagnóstico IA: ${escapeHtml(category)}</span>
-            <span class="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">Confianza: ${Number.isFinite(confidence) ? (confidence * 100).toFixed(1) : 'N/D'}%</span>
+            <span class="font-semibold" style="color: ${style.textColor}">Diagnóstico: ${escapeHtml(category)}</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="color: ${style.confidenceTextColor}; background-color: ${style.confidenceBadgeBg}">Confianza: ${Number.isFinite(confidence) ? (confidence * 100).toFixed(1) : 'N/D'}%</span>
           </div>
           <p class="text-slate-300 text-xs">${escapeHtml(message)}</p>
         </div>

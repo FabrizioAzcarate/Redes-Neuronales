@@ -203,3 +203,12 @@ docker run --rm -p 8000:8000 linter-inteligente
 ├── requirements.txt
 └── README.md
 ```
+
+## Gestión del Proyecto
+
+El desarrollo y seguimiento de este proyecto se organiza mediante la metodología
+ágil Kanban. El tablero permite visualizar las tareas, priorizar el trabajo y
+dar seguimiento al progreso de cada actividad durante el ciclo de desarrollo.
+
+Consulta el tablero del proyecto en Trello:
+[Red Neuronal - Análisis de Código](https://trello.com/b/fE2he1lb/red-neuronal-analisis-codigo).

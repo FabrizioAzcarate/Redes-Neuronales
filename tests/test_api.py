@@ -36,6 +36,7 @@ class AnalyzeEndpointTests(unittest.TestCase):
         self.assertEqual(result["category"], "Error")
         self.assertEqual(result["issues"][0]["priority"], "high")
         self.assertEqual(model.calls, 0)
+        self.assertEqual(result["attention_map"], [])
 
     def test_syntax_error_uses_public_error_category(self):
         model = FakeModel(predicted_index=0)
@@ -46,6 +47,7 @@ class AnalyzeEndpointTests(unittest.TestCase):
         self.assertEqual(result["issues"][0]["code"], "SyntaxError")
         self.assertEqual(result["issues"][0]["priority"], "high")
         self.assertEqual(model.calls, 0)
+        self.assertEqual(result["attention_map"], [])
 
     def test_legacy_neural_category_is_not_reported_as_functional_error(self):
         model = FakeModel(predicted_index=2)
@@ -58,6 +60,13 @@ class AnalyzeEndpointTests(unittest.TestCase):
         self.assertEqual(result["issues"][0]["code"], "Clean")
         self.assertTrue(result["attention_breakdown"])
         self.assertEqual(model.calls, 1)
+        attention_map = result["attention_map"]
+        self.assertEqual(
+            [item["token"] for item in attention_map],
+            result["ast_sequence"].split(),
+        )
+        self.assertAlmostEqual(sum(item["weight"] for item in attention_map), 1.0)
+        self.assertTrue(all(0 <= item["weight"] <= 1 for item in attention_map))
 
 
 if __name__ == "__main__":

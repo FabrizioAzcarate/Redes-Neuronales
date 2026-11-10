@@ -132,6 +132,10 @@ Ejemplo de respuesta:
   "category": "Clean",
   "confidence": 0.9341,
   "ast_sequence": "Module FunctionDef arguments ...",
+  "attention_map": [
+    {"token": "Module", "weight": 0.18},
+    {"token": "FunctionDef", "weight": 0.13}
+  ],
   "attention_breakdown": [
     {"node": "FunctionDef", "relevance": "18.4%"},
     {"node": "Return", "relevance": "12.7%"}
@@ -141,8 +145,11 @@ Ejemplo de respuesta:
 
 También puede comprobar el estado del servicio con `GET /health`.
 
-El endpoint `/analyze` devuelve `Clean` o `Error`, la confianza, la secuencia AST
-y los nodos ordenados por relevancia según los pesos de atención. Los errores
+El endpoint `/analyze` devuelve `Clean` o `Error`, la confianza, la secuencia AST,
+`attention_map` con cada token AST en orden y su peso normalizado, y los tokens
+ordenados por relevancia según los pesos de atención. La pestaña **Explicabilidad
+BiLSTM** usa el mapa en orden para resaltar los tokens más influyentes; el resumen
+ordenado sigue disponible para consultar los valores exactos. Los errores
 sintácticos y funcionales demostrables por AST se reportan inmediatamente como
 errores de prioridad alta, antes de consultar la BiLSTM. Para código sintácticamente
 válido, la BiLSTM y su atención aditiva siguen aportando contexto; sus categorías

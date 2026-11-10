@@ -116,6 +116,7 @@ def analyze(request: CodeRequest):
                 }
             ],
             "attention_breakdown": [],
+            "attention_map": [],
             "logs": ["Validación AST fallida", message],
         }
 
@@ -141,6 +142,7 @@ def analyze(request: CodeRequest):
                 }
             ],
             "attention_breakdown": [],
+            "attention_map": [],
             "logs": ["Validación funcional determinista fallida", message],
         }
 
@@ -161,8 +163,8 @@ def analyze(request: CodeRequest):
         active_tokenizer = tokenizer
 
     try:
-        nodes, token_ids = _tokenize_ast_sequence(ast_sequence, active_tokenizer)
-        if not token_ids or len(nodes) != len(token_ids):
+        tokens, token_ids = _tokenize_ast_sequence(ast_sequence, active_tokenizer)
+        if not token_ids or len(tokens) != len(token_ids):
             raise ValueError("No se pudo alinear los tokens con los nodos AST.")
 
         inputs = torch.tensor([token_ids], dtype=torch.long, device=DEVICE)
@@ -172,8 +174,10 @@ def analyze(request: CodeRequest):
         logs.append("Inferencia BiLSTM exitosa")
 
         weights = attention_weights[0].detach().cpu().tolist()
+        if len(tokens) != len(weights):
+            raise ValueError("La atención no coincide con la longitud de los tokens AST.")
         breakdown = sorted(
-            zip(nodes, weights), key=lambda item: item[1], reverse=True
+            zip(tokens, weights), key=lambda item: item[1], reverse=True
         )
         confidence = float(probabilities[0, 0].item())
         logs.append("Cálculo de pesos de atención aditiva completado")
@@ -192,8 +196,12 @@ def analyze(request: CodeRequest):
                 }
             ],
             "attention_breakdown": [
-                {"node": node, "relevance": f"{weight:.1%}"}
-                for node, weight in breakdown
+                {"node": token, "relevance": f"{weight:.1%}"}
+                for token, weight in breakdown
+            ],
+            "attention_map": [
+                {"token": token, "weight": float(weight)}
+                for token, weight in zip(tokens, weights)
             ],
             "logs": logs + [
                 "La BiLSTM aportó contexto; sus categorías heredadas no se reportan como errores funcionales.",

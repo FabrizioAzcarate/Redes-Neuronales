@@ -19,11 +19,7 @@ if str(SRC_DIR) not in sys.path:
 
 from ast_parser import code_to_ast_sequence
 from cli import _build_fallback_tokenizer, _load_checkpoint
-from explainability import (
-    _tokenize_ast_sequence,
-    class_name_from_index,
-    has_critical_security_risk,
-)
+from explainability import _tokenize_ast_sequence
 from validator import validate_functional_errors
 
 MODEL_PATH = Path("models/bilstm_attention_model.pth")
@@ -104,7 +100,7 @@ def analyze(request: CodeRequest):
         description = error.msg or "error sintáctico no especificado"
         message = f"Error de sintaxis en la línea {line}, columna {column}: {description}."
         return {
-            "category": "SyntaxError",
+            "category": "Error",
             "confidence": 1.0,
             "code": request.code,
             "ast_sequence": "SyntaxError InvalidSyntax",
@@ -115,6 +111,8 @@ def analyze(request: CodeRequest):
                     "message": message,
                     "node": None,
                     "line": line,
+                    "column": column,
+                    "priority": "high",
                 }
             ],
             "attention_breakdown": [],
@@ -136,8 +134,10 @@ def analyze(request: CodeRequest):
                     "severity": "error",
                     "code": error_code,
                     "message": message,
-                    "node": "BinOp" if error_code == "TypeError" else None,
+                    "node": functional_error.get("node"),
                     "line": line,
+                    "column": functional_error.get("column"),
+                    "priority": "high",
                 }
             ],
             "attention_breakdown": [],
@@ -150,7 +150,6 @@ def analyze(request: CodeRequest):
             detail=f"El modelo no está disponible: {model_error}",
         )
 
-    confidence_threshold = 0.80
     logs = ["Inicio del análisis de código"]
     ast_sequence = code_to_ast_sequence(request.code)
     logs.append("Parsing AST completado")
@@ -170,90 +169,36 @@ def analyze(request: CodeRequest):
         with torch.no_grad():
             logits, attention_weights = model(inputs)
             probabilities = torch.softmax(logits, dim=1)
-            predicted_index = int(torch.argmax(probabilities, dim=1).item())
         logs.append("Inferencia BiLSTM exitosa")
 
         weights = attention_weights[0].detach().cpu().tolist()
         breakdown = sorted(
             zip(nodes, weights), key=lambda item: item[1], reverse=True
         )
-        category = class_name_from_index(predicted_index)
-        confidence = float(probabilities[0, predicted_index].item())
-        is_critical_security = (
-            category == "SecurityRisk"
-            and has_critical_security_risk(request.code)
-        )
-        is_error_category = is_critical_security
+        confidence = float(probabilities[0, 0].item())
         logs.append("Cálculo de pesos de atención aditiva completado")
-        if confidence < confidence_threshold:
-            clean_message = (
-                "No se detectaron anomalías críticas en el flujo; "
-                "el código supera la validación sintáctica."
-            )
-            return {
-                "category": "Clean",
-                "confidence": round(confidence, 4),
-                "code": request.code,
-                "ast_sequence": ast_sequence,
-                "issues": [
-                    {
-                        "severity": "info",
-                        "code": "Clean",
-                        "message": clean_message,
-                        "node": None,
-                        "line": None,
-                    }
-                ],
-                "attention_breakdown": [],
-                "logs": logs + ["Confianza inferior al umbral; análisis considerado limpio"],
-            }
-
-        if not is_error_category:
-            clean_message = "No se detectaron anomalías críticas en el flujo."
-            return {
-                "category": "Clean",
-                "confidence": round(confidence, 4),
-                "code": request.code,
-                "ast_sequence": ast_sequence,
-                "issues": [
-                    {
-                        "severity": "info",
-                        "code": "Clean",
-                        "message": clean_message,
-                        "node": None,
-                        "line": None,
-                    }
-                ],
-                "attention_breakdown": [],
-                "logs": logs + ["El modelo clasificó el código como limpio"],
-            }
-
-        input_lines = [
-            line_number
-            for line_number, line in enumerate(request.code.splitlines(), start=1)
-            if "input(" in line
-        ]
-        issues = [
-            {
-                "severity": "error",
-                "code": category,
-                "message": f"Clasificación detectada: {category}.",
-                "node": breakdown[0][0] if breakdown else None,
-                "line": input_lines[0] if input_lines else None,
-            }
-        ]
-
         return {
-            "category": category,
+            "category": "Clean",
             "confidence": round(confidence, 4),
             "code": request.code,
             "ast_sequence": ast_sequence,
-            "issues": issues,
+            "issues": [
+                {
+                    "severity": "info",
+                    "code": "Clean",
+                    "message": "No se detectaron errores funcionales deterministas.",
+                    "node": None,
+                    "line": None,
+                }
+            ],
             "attention_breakdown": [
                 {"node": node, "relevance": f"{weight:.1%}"}
                 for node, weight in breakdown
             ],
-            "logs": logs + ["Análisis finalizado"],
+            "logs": logs + [
+                "La BiLSTM aportó contexto; sus categorías heredadas no se reportan como errores funcionales.",
+                "Análisis finalizado",
+            ],
         }
     except (RuntimeError, TypeError, ValueError, KeyError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

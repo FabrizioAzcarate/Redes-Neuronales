@@ -14,6 +14,7 @@ if str(SRC_DIR) not in sys.path:
 from ast_parser import code_to_ast_sequence
 from explainability import CLASS_NAMES, explain_code
 from model import CodeClassifier
+from validator import validate_functional_errors
 
 DEFAULT_MODEL_PATH = Path("models/bilstm_attention_model.pth")
 
@@ -83,6 +84,16 @@ def main():
     except (OSError, UnicodeError) as error:
         print(f"[ERROR] No se pudo leer el archivo '{file_path}': {error}", file=sys.stderr)
         return 2
+
+    functional_error = validate_functional_errors(code)
+    if functional_error is not None:
+        print("Diagnóstico: Error")
+        print(functional_error["message"])
+        print(
+            f"Línea: {functional_error['line']}, "
+            f"columna: {functional_error.get('column', 1)}"
+        )
+        return 0
 
     if not model_path.is_file():
         print(

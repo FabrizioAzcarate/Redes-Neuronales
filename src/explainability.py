@@ -11,41 +11,21 @@ import torch
 try:
     from ast_parser import code_to_ast_sequence
     from model import get_code_model
+    from validator import validate_functional_errors
 except ModuleNotFoundError:
     sys.path.append(str(Path(__file__).resolve().parent))
     from ast_parser import code_to_ast_sequence
     from model import get_code_model
+    from validator import validate_functional_errors
 
 
 CLASS_NAMES = ("Clean", "SyntaxError", "SecurityRisk")
 
 
 def class_name_from_index(predicted_index):
-    """Mapea salidas del modelo a categorías públicas conservadoras.
-
-    El índice 3 corresponde a ``BadPractice`` en checkpoints antiguos. Se
-    conserva como salida del modelo para poder cargar esos checkpoints, pero
-    se clasifica públicamente como código limpio.
-    """
-    if predicted_index < len(CLASS_NAMES):
-        return CLASS_NAMES[predicted_index]
+    """Evita convertir etiquetas neuronales heredadas en errores funcionales."""
+    _ = predicted_index
     return "Clean"
-
-
-def has_critical_security_risk(code_string):
-    """Detecta únicamente llamadas AST consideradas riesgos críticos."""
-    try:
-        tree = ast.parse(code_string)
-    except (SyntaxError, TypeError):
-        return False
-
-    critical_names = {"eval", "exec"}
-    return any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id in critical_names
-        for node in ast.walk(tree)
-    )
 
 
 def _tokenize_ast_sequence(ast_sequence, tokenizer):
@@ -101,6 +81,11 @@ def explain_code(code_string, model, tokenizer, device):
     Returns:
         Tupla ``(predicted_class, attention_weights)``.
     """
+    functional_error = validate_functional_errors(code_string)
+    if functional_error is not None:
+        print(f"Error funcional: {functional_error['message']}")
+        return "Error", torch.empty((1, 0), device=device)
+
     ast_sequence = code_to_ast_sequence(code_string)
     nodes = _node_labels(code_string, ast_sequence)
     tokens, token_ids = _tokenize_ast_sequence(ast_sequence, tokenizer)

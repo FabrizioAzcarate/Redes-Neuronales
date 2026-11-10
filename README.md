@@ -9,7 +9,7 @@
 
 Un linter tradicional aplica reglas estáticas predefinidas y suele devolver un diagnóstico sin explicar qué partes del código influyeron en él. Este proyecto evoluciona ese enfoque mediante un clasificador profundo de código Python: transforma el programa en una secuencia de nodos de su **Árbol de Sintaxis Abstracta (AST)**, procesa la secuencia con una **BiLSTM** y utiliza un mecanismo de **atención** para ponderar los nodos más relevantes.
 
-El resultado combina una categoría predicha con una explicación legible basada en los pesos de atención. Así, el modelo no solo clasifica la calidad o el tipo de problema, sino que también señala qué elementos estructurales del código contribuyeron al diagnóstico. [cite: 6]
+El backend combina reglas deterministas sobre el AST para errores sintácticos y funcionales evidentes con la BiLSTM y su atención aditiva como análisis contextual. La salida pública se limita a `Clean` o a errores funcionales reales; la atención señala qué elementos estructurales del código contribuyeron al análisis. [cite: 6]
 
 ## Métricas
 
@@ -129,7 +129,7 @@ Ejemplo de respuesta:
 
 ```json
 {
-  "category": "good",
+  "category": "Clean",
   "confidence": 0.9341,
   "ast_sequence": "Module FunctionDef arguments ...",
   "attention_breakdown": [
@@ -141,8 +141,12 @@ Ejemplo de respuesta:
 
 También puede comprobar el estado del servicio con `GET /health`.
 
-El endpoint `/analyze` devuelve la categoría predicha, el nivel de confianza, la
-secuencia AST y los nodos ordenados por relevancia según los pesos de atención.
+El endpoint `/analyze` devuelve `Clean` o `Error`, la confianza, la secuencia AST
+y los nodos ordenados por relevancia según los pesos de atención. Los errores
+sintácticos y funcionales demostrables por AST se reportan inmediatamente como
+errores de prioridad alta, antes de consultar la BiLSTM. Para código sintácticamente
+válido, la BiLSTM y su atención aditiva siguen aportando contexto; sus categorías
+heredadas no se exponen como errores funcionales.
 
 La interfaz también permite ejecutar el código del editor con **Ejecutar Código**.
 Los valores para llamadas a `input()` se introducen uno por línea y se envían a

@@ -4,16 +4,16 @@
 
 ### Capacidades del Agente
 
-#### 1. Gestión y Tokenización de Código (`src/dataset.py`)
+#### 1. Gestión y Tokenización de Código (`src/models/dataset.py`)
 - Carga de fragmentos de código fuente en Python, tokenización de secuencias, padding/truncado y preparación de DataLoaders.
 
-#### 2. Modelado de Secuencias de Código (`src/model.py`)
+#### 2. Modelado de Secuencias de Código (`src/models/model.py`)
 - Arquitectura en PyTorch con capas de Embedding, red recurrente bidireccional (BiLSTM) / Transformer y clasificador denso para 4 clases.
 
-#### 3. Bucle de Entrenamiento Parametrizado (`src/train.py`)
+#### 3. Bucle de Entrenamiento Parametrizado (`src/services/train.py`)
 - Control de épocas, tamaño de lote (*batch size*), tasa de aprendizaje (*learning rate*), función de pérdida (*CrossEntropyLoss*) y optimizador (*AdamW*).
 
-#### 4. Evaluación de Métricas (`src/evaluate.py`)
+#### 4. Evaluación de Métricas (`src/services/evaluate.py`)
 - Cálculo e informe detallado de Accuracy, Precision, Recall y F1-Score general y por categoría de error.
 
 #### 5. Registro de Bitácora Persistente (`MEMORIA.md`)

@@ -108,7 +108,7 @@ La CLI imprime la categoría detectada y los nodos AST ordenados por relevancia.
 Inicie el servidor FastAPI desde la raíz del proyecto:
 
 ```bash
-uvicorn src.controllers.api:app --reload
+uvicorn src.controllers.api:app --reload --port 8000
 ```
 
 La interfaz web queda disponible en `http://127.0.0.1:8000/`. La ruta principal sirve
@@ -194,14 +194,14 @@ docker run --rm -p 8000:8000 linter-inteligente
 │   │   ├── api.py                # API REST con FastAPI
 │   │   └── cli.py                # Interfaz de línea de comandos
 │   ├── models/
+│   │   ├── model.py              # BiLSTM + atención
 │   │   ├── ast_parser.py         # Conversión de código a secuencia AST
-│   │   ├── dataset.py            # Preparación del dataset
-│   │   └── model.py              # BiLSTM + atención
+│   │   └── dataset.py            # Preparación del dataset
 │   ├── services/
-│   │   ├── evaluate.py           # Evaluación de métricas
+│   │   ├── validator.py          # Validación funcional
 │   │   ├── explainability.py     # Inferencia y atención explicable
 │   │   ├── train.py              # Entrenamiento
-│   │   └── validator.py          # Validación funcional
+│   │   └── evaluate.py           # Evaluación de métricas
 │   └── views/
 │       └── index.html            # Interfaz web
 ├── Dockerfile

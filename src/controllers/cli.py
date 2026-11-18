@@ -6,17 +6,14 @@ import sys
 
 import torch
 
-# Permite ejecutar el script desde la raíz del proyecto con ``python src/cli.py``.
-SRC_DIR = Path(__file__).resolve().parent
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-from ast_parser import code_to_ast_sequence
-from explainability import CLASS_NAMES, explain_code
-from model import CodeClassifier
-from validator import validate_functional_errors
+from src.models.ast_parser import code_to_ast_sequence
+from src.models.model import CodeClassifier
+from src.services.explainability import CLASS_NAMES, explain_code
+from src.services.validator import validate_functional_errors
 
-DEFAULT_MODEL_PATH = Path("models/bilstm_attention_model.pth")
+DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "bilstm_attention_model.pth"
 
 
 def _load_checkpoint(model_path, device):

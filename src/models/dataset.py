@@ -1,8 +1,14 @@
 import argparse
+from pathlib import Path
+
 import pandas as pd
 from torch.utils.data import Dataset
 
-from ast_parser import code_to_ast_sequence
+from src.models.ast_parser import code_to_ast_sequence
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_INPUT_CSV = PROJECT_ROOT / "data" / "raw_dataset.csv"
+DEFAULT_OUTPUT_CSV = PROJECT_ROOT / "data" / "ast_dataset.csv"
 
 class CodeDataset(Dataset):
     def __init__(self, samples):
@@ -14,7 +20,7 @@ class CodeDataset(Dataset):
     def __getitem__(self, idx):
         return self.samples[idx]
 
-def preprocess_dataset(input_csv="data/raw_dataset.csv", output_csv="data/ast_dataset.csv"):
+def preprocess_dataset(input_csv=DEFAULT_INPUT_CSV, output_csv=DEFAULT_OUTPUT_CSV):
     df = pd.read_csv(input_csv)
 
     print("[INFO] Convirtiendo fragmentos de código a secuencias AST...")
@@ -25,7 +31,7 @@ def preprocess_dataset(input_csv="data/raw_dataset.csv", output_csv="data/ast_da
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocesamiento del dataset de código")
-    parser.add_argument("--input-csv", default="data/raw_dataset.csv", help="CSV de entrada")
-    parser.add_argument("--output-csv", default="data/ast_dataset.csv", help="CSV procesado de salida")
+    parser.add_argument("--input-csv", default=DEFAULT_INPUT_CSV, help="CSV de entrada")
+    parser.add_argument("--output-csv", default=DEFAULT_OUTPUT_CSV, help="CSV procesado de salida")
     args = parser.parse_args()
     preprocess_dataset(args.input_csv, args.output_csv)

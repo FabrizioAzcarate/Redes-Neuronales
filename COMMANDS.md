@@ -6,10 +6,10 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 # === Pipeline de Ejecución de Redes Neuronales ===
-python src/dataset.py --prepare
-python src/train.py --model_type base --epochs 10 --batch_size 32 --lr 0.001
-python src/train.py --model_type base --epochs 20 --batch_size 64 --lr 0.0001
-python src/evaluate.py --model_path models/best_model.pth
+python -m src.models.dataset
+python -m src.services.train --epochs 10 --batch_size 32 --lr 0.001
+python -m src.services.train --epochs 20 --batch_size 64 --lr 0.0001
+python -m src.services.evaluate
 
 # === Control de Versiones ===
 git status

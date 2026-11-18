@@ -1,22 +1,12 @@
 """Herramientas de explicabilidad robustas para el clasificador de código basado en AST."""
 
 import ast
-from pathlib import Path
-import sys
 
 import torch
 
-# Permite ejecutar el archivo como ``python src/explainability.py`` o importarlo
-# como ``src.explainability`` desde la raíz del proyecto.
-try:
-    from ast_parser import code_to_ast_sequence
-    from model import get_code_model
-    from validator import validate_functional_errors
-except ModuleNotFoundError:
-    sys.path.append(str(Path(__file__).resolve().parent))
-    from ast_parser import code_to_ast_sequence
-    from model import get_code_model
-    from validator import validate_functional_errors
+from src.models.ast_parser import code_to_ast_sequence
+from src.models.model import get_code_model
+from src.services.validator import validate_functional_errors
 
 
 CLASS_NAMES = ("Clean", "SyntaxError", "SecurityRisk")

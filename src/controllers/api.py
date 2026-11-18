@@ -13,16 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-SRC_DIR = Path(__file__).resolve().parent
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-from ast_parser import code_to_ast_sequence
-from cli import _build_fallback_tokenizer, _load_checkpoint
-from explainability import _tokenize_ast_sequence
-from validator import validate_functional_errors
+from src.controllers.cli import _build_fallback_tokenizer, _load_checkpoint
+from src.models.ast_parser import code_to_ast_sequence
+from src.services.explainability import _tokenize_ast_sequence
+from src.services.validator import validate_functional_errors
 
-MODEL_PATH = Path("models/bilstm_attention_model.pth")
+MODEL_PATH = PROJECT_ROOT / "models" / "bilstm_attention_model.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -67,13 +65,8 @@ else:
 
 @app.get("/")
 def serve_frontend():
-    """Sirve el frontend desde la raíz del proyecto o desde src."""
-    project_root = Path(__file__).resolve().parent.parent
-    html_path = project_root / "index.html"
-    if not html_path.is_file():
-        html_path = Path(__file__).resolve().parent / "index.html"
-    if not html_path.is_file():
-        html_path = Path(__file__).resolve().parent / "app.html"
+    """Sirve el frontend desde el directorio de vistas."""
+    html_path = PROJECT_ROOT / "src" / "views" / "index.html"
     if not html_path.is_file():
         raise HTTPException(status_code=404, detail="Frontend no encontrado")
     return FileResponse(html_path)
@@ -269,4 +262,4 @@ def run_code(request: RunRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("src.controllers.api:app", host="0.0.0.0", port=8000, reload=False)

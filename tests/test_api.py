@@ -1,13 +1,10 @@
-import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-import api
+import src.controllers.api as api
 
 
 class FakeModel:
@@ -26,6 +23,15 @@ class FakeModel:
 
 
 class AnalyzeEndpointTests(unittest.TestCase):
+    def test_serves_frontend_from_views_directory(self):
+        response = api.serve_frontend()
+
+        self.assertEqual(
+            Path(response.path),
+            api.PROJECT_ROOT / "src" / "views" / "index.html",
+        )
+        self.assertTrue(Path(response.path).is_file())
+
     def test_functional_error_preempts_neural_inference(self):
         model = FakeModel(predicted_index=0)
         with patch.object(api, "model", model), patch.object(

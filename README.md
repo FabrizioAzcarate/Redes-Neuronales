@@ -92,13 +92,13 @@ Coloque el checkpoint entrenado en `models/bilstm_attention_model.pth`. Sin este
 Analice un archivo Python con el modelo por defecto:
 
 ```bash
-python src/cli.py --file ruta/al/archivo.py
+python -m src.controllers.cli --file ruta/al/archivo.py
 ```
 
 Para usar otro checkpoint:
 
 ```bash
-python src/cli.py --file ruta/al/archivo.py --model models/otro_modelo.pth
+python -m src.controllers.cli --file ruta/al/archivo.py --model models/otro_modelo.pth
 ```
 
 La CLI imprime la categoría detectada y los nodos AST ordenados por relevancia.
@@ -108,12 +108,11 @@ La CLI imprime la categoría detectada y los nodos AST ordenados por relevancia.
 Inicie el servidor FastAPI desde la raíz del proyecto:
 
 ```bash
-uvicorn src.api:app --reload
+uvicorn src.controllers.api:app --reload
 ```
 
 La interfaz web queda disponible en `http://127.0.0.1:8000/`. La ruta principal sirve
-`index.html` si existe en la raíz del proyecto y, en caso contrario, utiliza el
-frontend incluido en `src/index.html`. Desde esa interfaz puede editar código Python
+el frontend ubicado en `src/views/index.html`. Desde esa interfaz puede editar código Python
 en el editor integrado y enviarlo al modelo con el botón **Analizar con la red**.
 
 La documentación interactiva queda disponible en `http://127.0.0.1:8000/docs`.
@@ -191,14 +190,20 @@ docker run --rm -p 8000:8000 linter-inteligente
 │   └── colab_runner.ipynb
 ├── reports/                      # Reportes y resultados
 ├── src/
-│   ├── api.py                    # API REST con FastAPI
-│   ├── ast_parser.py             # Conversión de código a secuencia AST
-│   ├── cli.py                    # Interfaz de línea de comandos
-│   ├── dataset.py                # Preparación del dataset
-│   ├── evaluate.py               # Evaluación de métricas
-│   ├── explainability.py         # Inferencia y atención explicable
-│   ├── model.py                  # BiLSTM + atención
-│   └── train.py                  # Entrenamiento
+│   ├── controllers/
+│   │   ├── api.py                # API REST con FastAPI
+│   │   └── cli.py                # Interfaz de línea de comandos
+│   ├── models/
+│   │   ├── ast_parser.py         # Conversión de código a secuencia AST
+│   │   ├── dataset.py            # Preparación del dataset
+│   │   └── model.py              # BiLSTM + atención
+│   ├── services/
+│   │   ├── evaluate.py           # Evaluación de métricas
+│   │   ├── explainability.py     # Inferencia y atención explicable
+│   │   ├── train.py              # Entrenamiento
+│   │   └── validator.py          # Validación funcional
+│   └── views/
+│       └── index.html            # Interfaz web
 ├── Dockerfile
 ├── requirements.txt
 └── README.md

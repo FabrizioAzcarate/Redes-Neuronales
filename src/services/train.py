@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-import sys
 
 import pandas as pd
 import torch
@@ -11,15 +10,12 @@ import torch.optim as optim
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
-SRC_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SRC_DIR.parent
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-from ast_parser import code_to_ast_sequence
-from dataset import CodeDataset
-from explainability import CLASS_NAMES
-from model import CodeClassifier
+from src.models.ast_parser import code_to_ast_sequence
+from src.models.dataset import CodeDataset
+from src.models.model import CodeClassifier
+from src.services.explainability import CLASS_NAMES
 
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "bilstm_attention_model.pth"
 DEFAULT_DATA_PATHS = (

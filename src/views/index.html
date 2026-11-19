@@ -81,8 +81,12 @@
       </div>
 
       <!-- Entrada Stdin -->
-      <div class="border-t border-ide-border bg-ide-surface/90 p-2.5">
-        <label class="text-[11px] font-mono text-slate-400 block mb-1">Valores para input() (uno por línea, opcional):</label>
+      <div class="border-t border-emerald-900/70 bg-ide-surface/90 p-2.5">
+        <div class="flex items-center gap-2 mb-1">
+          <label for="stdin-input" class="text-[11px] font-mono text-slate-300">Entradas para ejecución</label>
+          <span class="text-[9px] font-mono uppercase tracking-wide text-emerald-300 bg-emerald-950/60 px-1.5 py-0.5 rounded">Solo Ejecutar Código</span>
+        </div>
+        <p class="text-[10px] text-slate-500 mb-1">Una respuesta por línea, en orden para cada llamada a input(). El análisis no usa estos valores.</p>
         <textarea id="stdin-input" class="w-full bg-[#0a0d14] border border-ide-border rounded font-mono text-xs text-slate-200 px-2 py-1 resize-none focus:outline-none" rows="2"></textarea>
       </div>
     </section>
@@ -311,7 +315,8 @@
 
   async function triggerRun() {
     const code = document.getElementById('code-input').value;
-    const inputs = document.getElementById('stdin-input').value;
+    const inputValues = document.getElementById('stdin-input').value;
+    const inputs = inputValues === '' ? [] : inputValues.split(/\r?\n/);
     const term = document.getElementById('terminal-screen');
     
     term.innerHTML += `<div class="text-slate-500">$ python3 main.py</div>`;
@@ -325,8 +330,14 @@
       const data = await response.json();
 
       if (data.stdout) term.innerHTML += `<pre class="text-slate-200 whitespace-pre-wrap">${data.stdout}</pre>`;
-      if (data.stderr) term.innerHTML += `<pre class="text-rose-400 whitespace-pre-wrap">${data.stderr}</pre>`;
-      term.innerHTML += `<div class="text-slate-500 text-[11px]">[Código de salida: ${data.exit_code}]</div>`;
+      if (typeof data.stderr === 'string' && data.stderr.includes('EOFError')) {
+        term.innerHTML += '<div class="text-amber-300">Faltan valores para input(). Agregá una respuesta por línea en “Entradas para ejecución” e intentá nuevamente.</div>';
+      } else if (data.stderr) {
+        term.innerHTML += `<pre class="text-rose-400 whitespace-pre-wrap">${data.stderr}</pre>`;
+      }
+      if (typeof data.return_code === 'number' && Number.isFinite(data.return_code)) {
+        term.innerHTML += `<div class="text-slate-500 text-[11px]">[Código de salida: ${data.return_code}]</div>`;
+      }
       term.scrollTop = term.scrollHeight;
     } catch (e) {
       term.innerHTML += `<div class="text-rose-400">Error conectando con el servidor de ejecución.</div>`;
